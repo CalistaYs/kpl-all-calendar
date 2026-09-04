@@ -57,16 +57,3 @@ jobs:
             git commit -m "Update KPL all-match calendar"
             git push
           fi
-
-      # 国内镜像供无法稳定访问 GitHub Raw 的日历客户端订阅。
-      - name: Sync calendar repository to Gitee
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-        run: |
-          if [ -z "$GITEE_TOKEN" ]; then
-            echo "::warning::GITEE_TOKEN is not configured; skipping Gitee sync"
-            exit 0
-          fi
-
-          git remote add gitee "https://CalistaYs:${GITEE_TOKEN}@gitee.com/CalistaYs/kpl-all-calendar.git"
-          git push gitee HEAD:main
