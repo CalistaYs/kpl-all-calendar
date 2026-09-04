@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-"""成都AG超玩会全官方赛事日历 -> calendar.ics 同步入口（完整扫描版）。
+"""KPL 所有比赛 -> kpl_all.ics 同步入口（完整扫描版）。
 
-数据来源（fetch.py）、字段解析与目标战队识别（match_parser.py）、数据校验
+数据来源（fetch.py）、字段解析（match_parser.py）、数据校验
 （validator.py）、ICS 渲染与合并（ics_generator.py）拆在各自模块里。核心的
 "给定一批赛事的原始数据，解析/校验/渲染/合并/写入"逻辑在 sync_calendar()，
 main() 只是在此之上加了"先做完整扫描拿到全部候选赛事的数据"这一步——这样
 smart_update.py 的高频模式可以直接复用 sync_calendar()，不需要另一套逻辑。
 
-任何一步看起来不对，都会保留现有 calendar.ics、不覆盖。
+任何一步看起来不对，都会保留现有 kpl_all.ics、不覆盖。
 """
 import os
 import sys
 
 from fetch import scan_all_seasons
 from ics_generator import build_calendar, extract_uids, merge_calendars, parse_calendar_events
-from match_parser import TARGET_TEAM, list_teams, parse_matches
+from match_parser import list_teams, parse_matches
 from validator import validate_matches
 
-CALENDAR_PATH = "calendar.ics"
-NEW_CALENDAR_PATH = "calendar.new.ics"
+CALENDAR_PATH = "kpl_all.ics"
+NEW_CALENDAR_PATH = "kpl_all.new.ics"
 
 
 def read_existing_calendar():
@@ -65,7 +65,7 @@ def sync_calendar(season_results, preserve_unchanged_dtstamp=False):
     路径下都不会被覆盖。
     """
     if not season_results:
-        print("[INFO] 没有传入任何赛事数据，保留现有 calendar.ics，不做改动。")
+        print("[INFO] 没有传入任何赛事数据，保留现有 kpl_all.ics，不做改动。")
         return True
 
     valid_season_ids = sorted(season_results.keys())
@@ -82,18 +82,18 @@ def sync_calendar(season_results, preserve_unchanged_dtstamp=False):
     for m in matches:
         print(f"[INFO] {m['home']} vs {m['away']}  阶段={m['stage_label'] or '未识别'}")
 
-    ag_counts_by_season = {}
+    counts_by_season = {}
     for m in matches:
-        ag_counts_by_season[m["season_id"]] = ag_counts_by_season.get(m["season_id"], 0) + 1
+        counts_by_season[m["season_id"]] = counts_by_season.get(m["season_id"], 0) + 1
     for season_id in valid_season_ids:
         print(
             f"[INFO] {season_id}：全部战队比赛 {len(season_results[season_id])} 场，"
-            f"目标战队（{TARGET_TEAM}）参赛 {ag_counts_by_season.get(season_id, 0)} 场"
+            f"成功解析 {counts_by_season.get(season_id, 0)} 场"
         )
         team_flags = list_teams(season_results[season_id])
-        team_list = ", ".join(f"[{name}]" if is_match else name for name, is_match in team_flags)
-        print(f"[INFO] {season_id} 参赛队伍（{len(team_flags)} 支，[方括号]=已匹配目标战队）：{team_list}")
-    print(f"[INFO] 本次合计目标战队参赛场次：{len(matches)}；解析异常跳过：{skipped} 场")
+        team_list = ", ".join(name for name, _ in team_flags)
+        print(f"[INFO] {season_id} 参赛队伍（{len(team_flags)} 支）：{team_list}")
+    print(f"[INFO] 本次合计比赛：{len(matches)} 场；解析异常跳过：{skipped} 场")
 
     existing_text = read_existing_calendar()
     existing_uids_in_scope = uids_for_seasons(existing_text, valid_season_ids)
@@ -104,11 +104,11 @@ def sync_calendar(season_results, preserve_unchanged_dtstamp=False):
     if not ok:
         for e in errors:
             print(f"[ERROR] {e}")
-        print("[ERROR] 数据校验未通过，保留现有 calendar.ics，不覆盖。")
+        print("[ERROR] 数据校验未通过，保留现有 kpl_all.ics，不覆盖。")
         return False
 
     if not matches:
-        print("[INFO] 本次没有扫描到任何目标战队的比赛，保留现有 calendar.ics，不做改动。")
+        print("[INFO] 本次没有扫描到任何比赛，保留现有 kpl_all.ics，不做改动。")
         return True
 
     existing_final_states = _existing_final_states(existing_text)
@@ -117,7 +117,7 @@ def sync_calendar(season_results, preserve_unchanged_dtstamp=False):
     if new_event_count != len(matches):
         print(
             f"[ERROR] 生成的 ICS 事件数（{new_event_count}）与解析到的比赛数"
-            f"（{len(matches)}）不一致，保留现有 calendar.ics，不覆盖。"
+            f"（{len(matches)}）不一致，保留现有 kpl_all.ics，不覆盖。"
         )
         return False
 
@@ -147,19 +147,19 @@ def sync_calendar(season_results, preserve_unchanged_dtstamp=False):
         print(
             f"[ERROR] 合并后事件数（{merged_event_count}）与预期不一致（其它赛事历史比赛 "
             f"{other_events_count} 场 + 本次处理的比赛 {new_event_count} 场 = "
-            f"{expected_count} 场），合并逻辑异常，保留现有 calendar.ics，不覆盖。"
+            f"{expected_count} 场），合并逻辑异常，保留现有 kpl_all.ics，不覆盖。"
         )
         return False
 
     changed = merged_text != existing_text
-    print(f"[INFO] calendar.ics 是否发生变化：{'是' if changed else '否'}")
+    print(f"[INFO] kpl_all.ics 是否发生变化：{'是' if changed else '否'}")
     if not changed:
         return True
 
     with open(NEW_CALENDAR_PATH, "w", encoding="utf-8", newline="\n") as f:
         f.write(merged_text)
     os.replace(NEW_CALENDAR_PATH, CALENDAR_PATH)
-    print(f"[INFO] 最终合并后 calendar.ics 共有 {merged_event_count} 场比赛。")
+    print(f"[INFO] 最终合并后 kpl_all.ics 共有 {merged_event_count} 场比赛。")
     return True
 
 
@@ -168,7 +168,7 @@ def main():
     if not season_results:
         print(
             "[ERROR] 扫描的所有候选赛事 ID 都没有拿到数据（可能签名失效、网络故障，"
-            "或官方接口发生了变化），保留现有 calendar.ics，退出。"
+            "或官方接口发生了变化），保留现有 kpl_all.ics，退出。"
         )
         sys.exit(1)
 

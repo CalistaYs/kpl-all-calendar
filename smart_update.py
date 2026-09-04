@@ -7,12 +7,12 @@ cron 是 '7,37 * * * *'）。
 - FULL_REFRESH：在固定的 UTC 整点（0/6/12/18 点的 :07 那次运行）做一次完整扫描，
   用来发现新比赛/新赛事/改期/对手变化/官方数据修正——逻辑完全复用
   update_calendar.py 的 sync_calendar()。
-- MATCH_REFRESH：不是完整扫描的时刻，但 calendar.ics 里有 AG 比赛正处于"临近
+- MATCH_REFRESH：不是完整扫描的时刻，但 kpl_all.ics 里有比赛正处于"临近
   开赛/进行中/刚结束但比分还没锁定"的窗口——只请求这些比赛涉及的 season_id
   （去重后），同样喂给 sync_calendar()，不写第二套解析/合并逻辑。
-- SKIP：两者都不是，直接退出，不发任何请求、不碰 calendar.ics。
+- SKIP：两者都不是，直接退出，不发任何请求、不碰 kpl_all.ics。
 
-calendar.ics 不存在、解析不出任何事件、或者解析出来的事件里没有一个带
+kpl_all.ics 不存在、解析不出任何事件、或者解析出来的事件里没有一个带
 X-SEASON-ID（说明是这次改动之前生成的旧文件，还没有 X- 字段）时，安全回退成
 FULL_REFRESH——这也是这个脚本第一次上线时"自动把旧 calendar.ics 迁移成带
 X-SEASON-ID/X-MATCH-FINAL-SCORE 新格式"的方式，不需要额外写一次性迁移脚本。
@@ -89,8 +89,8 @@ def classify_window(now, start, on_hour_run):
 
 
 def find_tracked_matches(now, ics_text):
-    """从 calendar.ics 的内容里找出仍处于高频跟踪窗口、且还没有确认最终比分的
-    AG 比赛。ics_text 为空、解析不出任何事件、或者一个带 X-SEASON-ID 的事件都
+    """从 kpl_all.ics 的内容里找出仍处于高频跟踪窗口、且还没有确认最终比分的
+    比赛。ics_text 为空、解析不出任何事件、或者一个带 X-SEASON-ID 的事件都
     没有（说明是旧格式文件，这个函数没法判断该不该跟踪）时返回 None——调用方
     应该据此回退到 FULL_REFRESH，而不是当成"没有比赛"直接 SKIP。
     """
@@ -99,7 +99,7 @@ def find_tracked_matches(now, ics_text):
     try:
         events = parse_calendar_events(ics_text)
     except Exception as exc:
-        print(f"[WARN] 解析 calendar.ics 失败（{exc}），回退到完整扫描")
+        print(f"[WARN] 解析 kpl_all.ics 失败（{exc}），回退到完整扫描")
         return None
 
     total_vevents = ics_text.count("BEGIN:VEVENT")
@@ -145,7 +145,7 @@ def _run_full_refresh():
     if not season_results:
         print(
             "[ERROR] 扫描的所有候选赛事 ID 都没有拿到数据（可能签名失效、网络故障，"
-            "或官方接口发生了变化），保留现有 calendar.ics，退出。"
+            "或官方接口发生了变化），保留现有 kpl_all.ics，退出。"
         )
         return False
     return sync_calendar(season_results, preserve_unchanged_dtstamp=False)
@@ -164,7 +164,7 @@ def _run_match_refresh(tracked):
 
     season_results = fetch_seasons(season_ids, log=print)
     if not season_results:
-        print("[ERROR] 涉及的赛事全部拉取失败，保留现有 calendar.ics，退出。")
+        print("[ERROR] 涉及的赛事全部拉取失败，保留现有 kpl_all.ics，退出。")
         return False
 
     ok = sync_calendar(season_results, preserve_unchanged_dtstamp=True)
@@ -193,13 +193,13 @@ def main():
     ics_text = read_existing_calendar()
     tracked = find_tracked_matches(now, ics_text)
     if tracked is None:
-        print("[WARN] calendar.ics 不存在或无法可靠解析（可能是旧格式，还没有 X-SEASON-ID），回退执行 FULL_REFRESH")
+        print("[WARN] kpl_all.ics 不存在或无法可靠解析（可能是旧格式，还没有 X-SEASON-ID），回退执行 FULL_REFRESH")
         ok = _run_full_refresh()
         sys.exit(0 if ok else 1)
 
     if not tracked:
         print("[INFO] 本次模式：SKIP")
-        print("[INFO] 当前没有需要高频跟踪的 AG 比赛，本次跳过")
+        print("[INFO] 当前没有需要高频跟踪的比赛，本次跳过")
         sys.exit(0)
 
     ok = _run_match_refresh(tracked)

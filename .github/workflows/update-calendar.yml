@@ -1,4 +1,4 @@
-name: Update KPL AG calendar
+name: Update KPL all-match calendar
 
 on:
   push:
@@ -22,7 +22,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: update-ag-calendar
+  group: update-kpl-all-calendar
   cancel-in-progress: false
 
 jobs:
@@ -50,11 +50,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- calendar.ics; then
-            echo "calendar.ics is already up to date"
+          if git diff --quiet -- kpl_all.ics; then
+            echo "kpl_all.ics is already up to date"
           else
-            git add calendar.ics
-            git commit -m "Update Chengdu AG calendar"
+            git add kpl_all.ics
+            git commit -m "Update KPL all-match calendar"
             git push
           fi
 
@@ -68,5 +68,5 @@ jobs:
             exit 0
           fi
 
-          git remote add gitee "https://CalistaYs:${GITEE_TOKEN}@gitee.com/CalistaYs/kpl-ag-calendar.git"
+          git remote add gitee "https://CalistaYs:${GITEE_TOKEN}@gitee.com/CalistaYs/kpl-all-calendar.git"
           git push gitee HEAD:main

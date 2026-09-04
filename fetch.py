@@ -72,7 +72,7 @@ class FetchError(Exception):
 
 
 def _http_get_json(url, timeout=20):
-    req = urllib.request.Request(url, headers={"User-Agent": "kpl-ag-calendar/3.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "kpl-all-calendar/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as response:
         body = response.read().decode("utf-8", errors="replace")
     return json.loads(body)

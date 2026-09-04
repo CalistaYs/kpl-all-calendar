@@ -13,6 +13,7 @@ DEFAULT_MAX_SCORE = 9
 
 MIN_YEAR = 2020
 MAX_YEAR = 2100
+PLACEHOLDER_TEAMS = {"待定", "TBD", "TBA", "未知", "-"}
 
 
 def max_plausible_score(bo_total):
@@ -25,6 +26,8 @@ def max_plausible_score(bo_total):
     """
     if not isinstance(bo_total, int) or bo_total <= 0:
         return None
+    if bo_total % 2 == 0:
+        return bo_total
     return (bo_total + 1) // 2
 
 
@@ -66,8 +69,13 @@ def validate_matches(matches, previous_count=None):
         if not (MIN_YEAR <= m["start"].year <= MAX_YEAR):
             errors.append(f"{uid} 开赛时间不合理：{m['start']}")
 
-        if not m["home"] or not m["away"] or m["home"] == m["away"]:
+        same_named_placeholder = (
+            m["home"] == m["away"] and m["home"].strip().upper() in PLACEHOLDER_TEAMS
+        )
+        if not m["home"] or not m["away"] or (m["home"] == m["away"] and not same_named_placeholder):
             errors.append(f"{uid} 对阵双方队名不合法：{m['home']!r} vs {m['away']!r}")
+        elif same_named_placeholder:
+            warnings.append(f"{uid} 对手尚未确定，保留官方占位赛程：{m['home']} vs {m['away']}")
 
     if previous_count is not None and previous_count > 0 and len(matches) < previous_count * 0.5:
         errors.append(

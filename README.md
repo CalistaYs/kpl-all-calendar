@@ -1,276 +1,76 @@
-# AG Superplay (成都AG超玩会) Official Match Calendar
+# KPL 全赛程订阅日历
 
-This repository publishes a subscribable calendar covering **all official esports events** the
-Chengdu AG Superplay (成都AG超玩会) Honor of Kings roster appears in — not just the current KPL
-season. It scans KPL's domestic splits, the year-end finals, and international events (EWC, KIC,
-and whatever else the official data covers) every run, and keeps the full history around even after
-a season ends.
+把所有 KPL 队伍的官方比赛放进同一个可订阅日历，自动跟随官方赛程更新。无需按战队分别维护，也不会影响原有的 [成都 AG 专属日历](https://github.com/CalistaYs/kpl-ag-calendar)。
 
-## 数据来源：官方接口，不再解析网页
+## 一键订阅
 
-赛程数据来自腾讯官方的 KPL/TGA 开放接口（`getSchedules`），这也是 pvp.qq.com 官网页面自己在用的接口
-（参见页面加载的 [`js/esports_index.js`](https://pvp.qq.com/match/kpl/js/esports_index.js) 里的
-`match_url`）。返回的是结构化 JSON，每场比赛自带：
+### 国内推荐（Gitee）
 
-- 官方开赛时间（精确到分钟）与真实比赛地点（`region`，如"成都"）
-- 官方比分、赛制（`bo_total`）与比赛状态（未开始/进行中/已结束）
-- 一个稳定、由腾讯赛程系统分配的比赛 ID（`scheduleid`，如 `KPL2026S2M3W3D3`）
+```text
+https://gitee.com/CalistaYs/kpl-all-calendar/raw/main/kpl_all.ics
+```
 
-用真实请求验证过，这个接口不止服务 KPL 国内联赛：同一个 `appid`/`sign` 组合还能拉到 Esports World Cup
-王者荣耀项目（2024 年代号 `EWC2024`，2025 年起改成 `KWC{year}`，见下面"赛事自动发现"一节）、
-`KIC2025`（国际邀请赛）等国际赛事的数据——国际赛事里 AG 的参赛队名不固定（EWC2024 是
-**"All Gamers Global"**，KWC2025/KWC2026 是 **"AG"**），跟国内的"成都AG超玩会"完全不一样
-（见下面"目标战队识别"一节）。
+### GitHub 备用
 
-这比解析 HTML 页面/Wikipedia 表格可靠得多：不用再猜表格列顺序、不用处理页面改版、不用把整页拍平成
-token 流再猜边界。之前出现过的"比分/队伍/时间互相串行、同一场比赛重复出现、UID 冲突"等问题，
-根源都是在解析非结构化的 HTML；改成直接读官方结构化数据后，这一类问题不会再发生。
+```text
+https://raw.githubusercontent.com/CalistaYs/kpl-all-calendar/main/kpl_all.ics
+```
 
-官方没有提供"赛事列表"接口——探测过 `getSeasonList`/`getCompetitionList`/`getTournamentList` 等常见
-命名，全部返回签名校验失败，判断这些路由本身就不存在（详见下一节）。
+iPhone：打开 **设置 > 日历 > 账户 > 添加账户 > 其他 > 添加已订阅的日历**，粘贴上面的地址并保存。
 
-## 赛事自动发现：候选 ID 批量扫描
+日历名称为 **KPL 全赛程日历**。每场比赛包含：
 
-因为没有官方的赛事列表接口，`fetch.scan_all_seasons()` 改用"年份 x 赛事代号模板"批量试探候选
-赛事 ID，命中就收、没有就跳过，不会中断整个扫描：
+- 对阵双方、官方开赛时间与比赛阶段
+- BO 赛制、比赛地点（官方提供时）
+- 完赛比分（连续两次读取一致后确认）
+- 开赛前 1 小时和 30 分钟提醒
 
-| 模板 | 含义 | 验证状态 |
-|---|---|---|
-| `KPL{year}S1` | 春季赛 | 已验证（2024-2026 均有真实数据） |
-| `KPL{year}S2` | 夏季赛 | 已验证 |
-| `KPL{year}S3` | 年度总决赛 | 已验证（如 `KPL2025S3` = "2025王者荣耀年度总决赛"） |
-| `KPL{year}S4` | 预留给未来可能出现的第四个分段 | 未验证，命中就收 |
-| `EWC{year}` | Esports World Cup 王者荣耀项目，**仅 2024 年**用这个代号 | 已验证（`EWC2024`，AG 参赛队名 "All Gamers Global"） |
-| `KWC{year}` | 同一个 Esports World Cup 王者荣耀项目，**2025 年起**官方接口改用这个代号 | 已验证（`KWC2025`/`KWC2026`，AG 参赛队名是 "AG"） |
-| `KIC{year}` | 国际邀请赛 | 已验证（`KIC2025` 存在，但那一届没有 AG 参赛） |
-| `KCC{year}` | 挑战者杯 | 已验证（`KCC2026` 的官方 `season` 字段是 "2026年挑战者杯"，AG 参赛） |
-| `HOK{year}EWC` | 电竞世界杯的备用猜测代号 | 未验证，暂时没找到真实数据，保留作为候选 |
+## 数据与更新
 
-**EWC / KWC 都保留、互不替代**：Esports World Cup 的王者荣耀项目 2024 年用 `EWC{year}`，2025 年起
-官方接口改用了 `KWC{year}`；两届的展示名称还不统一（`KWC2025` 是"2025王者荣耀电竞世界杯"，`KWC2026`
-是"2026王者荣耀电竞世俱杯"），所以只能认 `seasonid` 前缀，不能靠展示名称判断。两个模板都在候选列表里，
-猜不中的那个自然会在日志里显示"无数据，跳过"，不影响另一个。
+数据来自腾讯 KPL/TGA 官方结构化接口 `getSchedules`，不是网页表格。项目自动扫描当前年份前后各一年内的候选赛事，包括 KPL 春季赛、夏季赛、年度总决赛、挑战者杯及官方接口覆盖的王者荣耀国际赛事。
 
-挑战者杯的真实代号（`KCC{year}`）不是显而易见的猜测——试过 `KPL{year}CC`、`KPL{year}CHALLENGE`、
-`KPL{year}TJB`、`KPL{year}CUP`、`CC{year}`、`HOK{year}CC`、`HOK{year}CUP`、`CHALLENGERCUP{year}`、
-`CHALLENGE{year}` 等十几种命名，全部返回空数据，只有 `KCC{year}` 命中；每次运行如果扫描到某个赛事的
-官方 `season` 标签里带"挑战者杯"三个字，会打印 `[INFO] Found Challenge Cup seasonid: xxx`，反之打印
-`[WARN] 未发现挑战者杯 seasonid`（不依赖写死的 ID，即使以后代号规律变了也能感知到）。
+GitHub Actions 每 30 分钟触发一次：
 
-默认扫描"今年 ± 1 年"（比如今年是 2026，就扫 2025/2026/2027），每个年份套用上面所有模板，去重后
-逐个请求；不存在 / 报错 / 无数据的候选记一条日志后跳过，已知有效的赛事完全不受影响。
+- 每 6 小时完整扫描，发现新赛事、新比赛、改期或取消。
+- 比赛临近、进行中和刚结束时提高比分刷新频率。
+- 其他时间不请求接口，直接跳过。
+- 更新先经过 UID、比分、时间、队名和场次数量校验；异常时保留上一版日历。
+- GitHub 更新完成后同步到同名 Gitee 仓库，供国内订阅。
 
-**不需要改代码就能扩展**：
+## 文件结构
 
-- 想加一个新赛事代号模板、或者官方启用了新赛事：设置 `SEASON_ID_PATTERNS` 环境变量（逗号分隔，
-  每一项里的 `{year}` 会被替换成具体年份；不含 `{year}` 的项会被当成写死的字面量 ID，比如某个
-  一次性赛事的固定代号）。
-- 想扩大/缩小扫描的年份范围（比如想一次性回溯更早的历史）：设置 `SEASON_SCAN_YEARS` 环境变量
-  （逗号分隔，如 `2020,2021,2022,2023,2024,2025,2026,2027`）。
-
-首次运行只会发现默认年份窗口（今年 ± 1）内的赛事；更早的历史（比如 2024 年的 EWC）需要手动把
-`SEASON_SCAN_YEARS` 临时调宽做一次性回溯抓取，抓到之后会被合并进 `calendar.ics` 永久保留（见下面
-"跨赛事历史保留"一节），不需要每次都用这么宽的窗口。
-
-## 目标战队识别：支持国际赛事别名
-
-不能只精确匹配"成都AG超玩会"这一个字符串——国际赛事里的队名完全不同（验证过的真实例子是
-"All Gamers Global"）。`match_parser.is_target_team()` 用别名 + 模糊匹配识别：
-
-- 默认别名清单：`成都AG超玩会`、`成都 AG 超玩会`、`AG超玩会`、`成都AG`、`AG`、`AG.AL`、`AG AL`、
-  `AG_AL`、`All Gamers`、`All Gamers Global`。
-- 匹配前先把大小写、空格、点(`.`)、下划线(`_`)、短横线(`-`)都归一化掉，所以 `AG.AL`/`AG AL`/
-  `AG_AL`/`ag-al` 会被认成同一个东西。
-- **中文别名、或归一化后长度 ≥ 5 的英文短语**（比如 `All Gamers`、`All Gamers Global`）：用包含匹配。
-- **短英文别名**（比如 `AG`）：只用整词匹配（按分隔符切词后逐词比较），不会用 `contains("ag")`
-  ——否则会把 `package`、`stage`、`magic` 这类词里恰好带着 "ag" 的普通单词也当成 AG（已经专门测试过
-  不会误命中这三个词）。
-
-可以用环境变量覆盖：
-
-- `TARGET_TEAM`：目标战队的规范名称，默认 `成都AG超玩会`。
-- `TARGET_TEAM_ALIASES`：完整别名清单（逗号分隔），设置后会整体替换默认清单（`TARGET_TEAM` 本身
-  会自动补进去，不用重复写）。
-
-## 代码结构
-
-逻辑拆成几个单一职责的模块，而不是全部堆在一个文件里：
-
-| 文件 | 职责 |
+| 文件 | 用途 |
 |---|---|
-| [`fetch.py`](fetch.py) | 调 TGA 官方接口拉数据；生成候选赛事 ID 并批量扫描 |
-| [`match_parser.py`](match_parser.py) | 把官方原始字段转成日历要用的统一格式；目标战队识别、队伍简称映射 |
-| [`validator.py`](validator.py) | 生成 ICS 前的数据完整性校验 |
-| [`ics_generator.py`](ics_generator.py) | 把校验通过的比赛渲染成 RFC5545 `.ics` 文本；跨赛事合并 |
-| [`update_calendar.py`](update_calendar.py) | 入口脚本，只负责把上面几个模块串起来 |
+| `kpl_all.ics` | 对外订阅的 KPL 全赛程日历 |
+| `fetch.py` | 调用官方接口并发现赛事 |
+| `match_parser.py` | 标准化所有比赛字段和队名简称 |
+| `validator.py` | 更新前的数据安全校验 |
+| `ics_generator.py` | 生成、合并和解析 ICS |
+| `update_calendar.py` | 完整更新入口 |
+| `smart_update.py` | GitHub Actions 智能刷新入口 |
 
-GitHub Actions 仍然只需要跑 `python update_calendar.py`（[`.github/workflows/update-calendar.yml`](.github/workflows/update-calendar.yml)），
-入口文件名和调用方式没变；国内赛事和国际赛事共用同一套 fetch/parser/validator/ics_generator，
-不需要为不同赛事写不同的处理逻辑。
+## 手动维护
 
-## 数据校验与安全更新
+日常不需要手动编辑 `kpl_all.ics`。赛季或队伍变动会从官方数据自动进入日历。
 
-写入 `calendar.ics` 之前，`validator.validate_matches()` 会检查：
-
-- 每场比赛最终会用到的 UID 是否唯一，出现重复直接判定失败（UID 一般直接用官方 `scheduleid`；如果
-  不同赛事的 `scheduleid` 恰好撞车，`ics_generator.make_uid()` 会自动拼上赛事代号前缀区分开，
-  校验用的是同一套逻辑算出来的最终 UID，不是裸 `scheduleid`）
-- 比分是否是非负整数；上限不写死成某个具体数字（不假设只有 BO5——验证过的真实数据里，KPL 常规赛
-  是 BO5、季后赛是 BO7）。如果官方接口带了赛制字段 `bo_total`（如 BO5=5），就按 `ceil(bo_total/2)`
-  动态算出单方最多能拿到的比分（BO5 最高 3、BO7 最高 4、BO9 最高 5……）；没有赛制信息时默认放宽到
-  0–9，这样 6:5、7:6、9:8 这类比分不会被误判失败。超过这个上限才判定异常——这条专门用来拦截
-  "抓到不相关数字当成比分"这类错误，历史上出现过 60:60、85:80 的假比分
-- 开赛时间是否落在合理年份范围内
-- 对阵双方队名是否合法（非空、且不是同一支队伍）
-- 本次解析到的比赛数量是否比上一次 `calendar.ics` 里**这次实际扫描到的这批赛事**的数量少了一半以上
-  （可能意味着数据源出了问题）——这里特意只跟"这次扫描到的赛事"比，不能跟日历里累计的全部历史比赛数
-  比，否则赛事一多、历史事件越攒越多，新赛季/新赛事刚开始、比赛数量还很少时就会被永远误判成异常
-
-**任何一项检查失败，脚本都会保留现有 `calendar.ics` 不动，打印详细错误后以非零状态退出**——
-这样 GitHub Actions 那次运行会显示失败（方便在 Actions 日志里定位原因），而不是把有问题的数据
-悄悄提交上去覆盖旧日历。**本次没有扫描到任何目标战队的比赛**（比如新赛季赛程还没公布）也会走同样
-的"保留现有文件、不覆盖"路径，只是不算错误、不会导致非零退出。
-
-校验通过后，脚本会先把新内容（跟历史比赛合并后的完整结果，见下面"跨赛事历史保留"一节）写到
-`calendar.new.ics`，确认合并后的事件数正好等于"其它赛事历史比赛数 + 本次扫描到的比赛数"后，
-再原子性地替换成 `calendar.ics`（`os.replace`），不会出现写到一半的半成品文件，也不会因为合并
-逻辑本身出错而丢事件或产生重复事件。
-
-脚本运行时会打印这些日志，方便在 Actions 里快速定位问题：扫描了哪些候选赛事 ID、哪些有效/哪些
-无效（不存在/请求失败）、每个有效赛事全部战队有多少场比赛、其中目标战队参赛多少场、解析异常跳过
-多少场、本次扫描范围内更新/新增/移除了多少场比赛、最终合并后 `calendar.ics` 共有多少场比赛。
-
-**每个有效赛事还会打印这个赛事出现过的全部队伍名**（`[方括号]` 标出被识别为目标战队的那一个），
-例如：
+需要临时扩大历史范围时，可设置：
 
 ```text
-[INFO] EWC2024 参赛队伍（14 支，[方括号]=已匹配目标战队）：[All Gamers Global], BOOM Esports, ...
+SEASON_SCAN_YEARS=2024,2025,2026,2027
 ```
 
-这是专门给"目标战队以后换了个没配置过的品牌名"这种情况准备的：`is_target_team()` 认不出新名字时
-不会报错、也不会主动提示，比赛会被静默当成"跟目标战队无关"漏掉；但队名本身还是会出现在这份清单里，
-人工扫一眼日志就能发现"这个名字看着像 AG，但没被打上方括号"，照着补进 `TARGET_TEAM_ALIASES`
-环境变量即可，不需要去翻原始数据排查。
+官方启用新的赛事代号时，可用逗号分隔的 `SEASON_ID_PATTERNS` 覆盖候选模板；模板中的 `{year}` 会自动替换为年份。
 
-## 队伍名称
-
-日历标题里，目标战队一方固定显示为 `AG`；对手统一使用去掉城市前缀的队伍简称，例如：
-
-- 重庆狼队 → 狼队
-- 苏州KSG → KSG
-- 济南RW侠 → RW侠
-- 北京WB → WB
-- 上海EDG.M → EDG.M
-
-国际赛事的对手（"Weibo Gaming"、"Team Falcons"……）不带这些城市前缀，原样显示。比赛标题格式固定为
-`AG VS 对手简称`。城市前缀去除逻辑在 [`match_parser.py`](match_parser.py) 的 `CITY_PREFIXES`
-（城市名清单）和 `short_team_name()` 函数里维护；`KNOWN_TEAMS` 是已知**国内**战队名单，只在国内
-常规赛/总决赛（`scheduleid` 形如 `KPL{年}S{n}`）里检查，仅用于给陌生队名打印警告（改名/扩军/缩编
-时），不会影响比赛是否被收录——国际赛事对手阵容变化很大，不维护完整名单，不在清单里不代表数据
-有问题。
-
-## 开赛时间、地点、阶段、比分与提醒
-
-- `DTSTART`/`DTEND` 直接用官方接口给出的真实开赛时间（`TZID=Asia/Shanghai`，北京时间 GMT+8），
-  订阅后 iPhone 日历会自动换算成本地时间显示；比赛时长按官方接口没有结束时间字段，固定按 3 小时估算。
-- 如果官方数据带地点，会同时写入 `LOCATION` 属性（iOS 日历会据此显示地图）和 DESCRIPTION 里的
-  "比赛地点：xxx"一行；官方没给地点时两处都不会出现，不编造。
-- 能识别出比赛阶段时，DESCRIPTION 第一行的赛事名称后面会用括号带上阶段，比如"KPL 2026年夏季赛
-  （常规赛第一轮）。"；识别不出来时第一行只有赛事名称，不加括号，不单独占一行、也不编造。所有赛事
-  （KPL 常规赛/季后赛/总决赛、挑战者杯、EWC、KIC 等）统一走这一套格式，见下面"比赛阶段"一节。
-- 比赛结束（官方 `match_state` 为已结束）且带了官方比分后，DESCRIPTION 会自动加上
-  "比赛结果：AG X:Y 对手简称"一行；未开赛或进行中不会出现这一行。
-- 每场比赛自带两条提醒：开赛前 1 小时、开赛前 30 分钟（`VALARM`）。
-
-DESCRIPTION 最终格式类似：
+本地完整刷新：
 
 ```text
-KPL 2026年夏季赛（常规赛第一轮）。
-成都AG超玩会 vs 重庆狼队。
-开赛时间：20:00（北京时间 GMT+8，官方数据）。
-比赛地点：成都
-官方观赛入口：https://pvp.qq.com/match/kpl/
+python update_calendar.py
 ```
 
-识别不出阶段时（`stage_label` 为 `None`），第一行退化成不带括号的普通赛事名称：
+本地测试：
 
 ```text
-KPL 2026年夏季赛。
-成都AG超玩会 vs 重庆狼队。
-开赛时间：20:00（北京时间 GMT+8，官方数据）。
-...
+python -m unittest discover -v
 ```
 
-## 比赛阶段（第一行赛事名称后括号里的内容）
-
-`match_parser.extract_stage_label()` 只使用官方接口里真实存在、且能确认含义的字段，不猜测、
-不编造。检查过官方接口实际会返回哪些字段：只有 `stage`（阶段代号，如 `cgs1`）、`stage_name`
-（阶段中文名，如"常规赛第一轮"）、`host_group`/`guest_group`/`match_group`（单字母，如
-`S`/`A`/`B`）——没有 `round`、`round_name`、`group_name`、`match_name`、`match_title`、`desc`
-这些字段。
-
-**这个函数曾经把 `host_group`/`guest_group` 直接拼成"常规赛 B组"这样的文字，后来发现这是错的**：
-用真实比赛核实过（成都AG超玩会 2026 夏季赛"常规赛第一轮"的几场比赛），`host_group`/`guest_group`
-的值确实是 `B`，但官方接口没有任何字段说明这个字母在"常规赛第一轮"这个语境下代表什么——它可能是
-"第一组/第二组/第三组"的内部编码，也可能跟"常规赛第二轮"里公开使用的"S组/A组/B组"完全是另一套
-语义，只是恰好用了相同的字母，没有办法用现有字段可靠区分。与其编造一个可能错误的"组别"，现在
-`extract_stage_label()` 不再尝试拼接组别，一律原样返回官方已经明确给出的 `stage_name`
-（"常规赛第一轮"本身已经说明是第几轮，不需要额外编造更细的信息）：
-
-- 官方给了 `stage_name` 就原样返回，不管是"常规赛第一轮"、"季后赛"、"决赛"、"卡位赛"、
-  "擂台赛"、"淘汰赛"、"小组赛"、"半决赛"、"单败淘汰赛"、"双败淘汰赛"、"表演赛"、"总决赛"……
-  都不做拆分或增强——拆成"胜者组第一轮"这种更细的说法，或是拼上"S/A/B组"这种组别后缀，在当前
-  接口字段里都没有可靠依据，不编造。
-- `stage_name` 本身缺失/为空时返回 `None`，DESCRIPTION 第一行不会带括号，避免用空信息误导。
-
-这套逻辑不区分具体是哪个赛事，KPL 常规赛/季后赛/总决赛、挑战者杯（`KCC{year}`）、EWC、KIC 全部
-共用同一个函数、同一套格式规则。
-
-脚本运行时会为每场目标战队的比赛打印解析出的阶段，方便核对，例如：
-
-```text
-[INFO] 成都AG超玩会 vs 重庆狼队  阶段=常规赛第一轮
-[INFO] 成都AG超玩会 vs KSG  阶段=季后赛
-```
-
-识别不出阶段时打印"阶段=未识别"。
-
-## UID、跨赛事历史保留与比赛延期/改期/取消/重赛
-
-每场比赛的 `UID` 直接基于官方 `scheduleid`（如 `KPL2026S2M3W3D3`）生成，这是腾讯赛程系统给这场
-比赛分配的稳定标识，不会随开赛时间、地点、比分变化，而且天然带着赛事代号（`scheduleid` 本身以
-`season_id` 开头）。
-
-`update_calendar.py` 每次运行会扫描一批候选赛事 ID（见上面"赛事自动发现"），但写回 `calendar.ics`
-时会跟文件里已有的内容合并（[`ics_generator.merge_calendars()`](ics_generator.py)），而不是整份
-覆盖：
-
-- **不属于这次扫描到的赛事的历史比赛**（UID 前缀是其它赛事）——也就是这次没有请求到、或者已经
-  切换过去的赛季/赛事——原样保留，不会因为赛季/赛事切换、或者某个赛事这次临时拉取失败，就从日历里
-  消失；未被触及的历史事件也保留原有的 `DTSTAMP`。
-- **属于这次扫描到的赛事的比赛**，以这次抓取的完整结果为准：官方修改开赛时间/地点、更新比分，
-  重新抓取后会更新同一个日历事件（`DTSTART`/`DTEND`/`LOCATION`/`DESCRIPTION`），不会产生重复事件；
-  如果一场比赛从官方接口的返回结果里彻底消失（比如被取消），下次刷新后它也会跟着从这个赛事里移除
-  ——因为每次都是拉取"该赛事的完整赛程"，不是增量更新，所以能安全地这样处理，不会误删其它赛事的
-  历史记录。
-
-这样，春季赛结束、夏季赛开始、EWC 开始、挑战者杯开始……历史赛程都会一直保留在 `calendar.ics` 里。
-
-## iOS 订阅方法
-
-1. 打开本仓库的 [`calendar.ics`](calendar.ics)，点击 "Raw" 获取原始文件链接，或直接复制下面的固定链接：
-
-```text
-https://raw.githubusercontent.com/CalistaYs/kpl-ag-calendar/main/calendar.ics
-```
-
-2. 在 iPhone 上打开 **设置 > 日历 > 账户 > 添加账户 > 其他 > 添加已订阅的日历**（Settings > Calendar > Accounts > Add Account > Other > Add Subscribed Calendar）。
-3. 粘贴上面的链接，保存即可。之后每次仓库更新 `calendar.ics`，订阅的日历会自动同步（iOS 有自己的刷新间隔，也可以在日历账户设置里手动设置刷新频率）。
-4. 打开任意一场比赛，应能看到具体开赛时间（本地时间，并标注 GMT+8 对应的北京时间）、比赛地点（如有）以及开赛前 1 小时和 30 分钟的提醒。
-
-## 更新方式
-
-GitHub Actions（[`.github/workflows/update-calendar.yml`](.github/workflows/update-calendar.yml)）每 6 小时自动运行一次并提交变更。
-
-Official KPL viewing page:
-https://pvp.qq.com/match/kpl/
+官方赛事页面：https://pvp.qq.com/match/kpl/

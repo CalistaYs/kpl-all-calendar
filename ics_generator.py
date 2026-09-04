@@ -3,14 +3,7 @@
 import datetime as dt
 import re
 
-from match_parser import (
-    AG_SHORT_NAME,
-    MATCH_STATE_FINISHED,
-    is_legal_final_score,
-    is_target_team,
-    opponent_of,
-    short_team_name,
-)
+from match_parser import MATCH_STATE_FINISHED, is_legal_final_score, short_team_name
 
 DEFAULT_DURATION_HOURS = 3
 ALARM_OFFSETS = ("-PT1H", "-PT30M")
@@ -129,10 +122,10 @@ def build_calendar(matches, dtstamp=None, existing_final_states=None):
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//CalistaYs//KPL AG Calendar//ZH-CN",
+        "PRODID:-//CalistaYs//KPL All Matches Calendar//ZH-CN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        "X-WR-CALNAME:成都AG超玩会官方赛事日历",
+        "X-WR-CALNAME:KPL 全赛程日历",
         "X-WR-TIMEZONE:Asia/Shanghai",
         "X-PUBLISHED-TTL:PT6H",
         "BEGIN:VTIMEZONE",
@@ -149,9 +142,9 @@ def build_calendar(matches, dtstamp=None, existing_final_states=None):
     for m in matches:
         start = m["start"]
         end = start + dt.timedelta(hours=DEFAULT_DURATION_HOURS)
-        opponent = opponent_of(m)
-        opponent_short = short_team_name(opponent)
-        summary = f"{AG_SHORT_NAME} VS {opponent_short}"
+        home_short = short_team_name(m["home"])
+        away_short = short_team_name(m["away"])
+        summary = f"{home_short} VS {away_short}"
         location = m["location"]
         uid = make_uid(m["season_id"], m["scheduleid"])
 
@@ -168,10 +161,9 @@ def build_calendar(matches, dtstamp=None, existing_final_states=None):
             f"对阵：{m['home']} vs {m['away']}",
         ]
         if status_label == "已完赛" and has_display_score:
-            is_ag_home = is_target_team(m["home"])
-            ag_score = display_home if is_ag_home else display_away
-            opp_score = display_away if is_ag_home else display_home
-            desc_lines.append(f"最终比分：{AG_SHORT_NAME} {ag_score} : {opp_score} {opponent_short}")
+            desc_lines.append(
+                f"最终比分：{home_short} {display_home} : {display_away} {away_short}"
+            )
         else:
             time_label = "预计开赛" if status_label == "未开赛" else "开赛时间"
             desc_lines.append(f"{time_label}：{start.strftime('%Y-%m-%d %H:%M')}（北京时间 GMT+8）")

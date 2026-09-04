@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""把 TGA 官方接口返回的原始比赛记录，转成日历生成需要的统一字段；负责判断
-一场比赛是否跟目标战队（默认成都AG超玩会，也认得出国际赛事里的别名）有关。
-"""
+"""把 TGA 官方接口返回的原始比赛记录转换成日历使用的统一字段。"""
 import datetime as dt
 import os
 import re
@@ -76,6 +74,11 @@ def is_legal_final_score(home_score, away_score, bo_total):
     for score in (home_score, away_score):
         if not isinstance(score, int) or isinstance(score, bool) or score < 0:
             return False
+    if bo_total % 2 == 0:
+        # 官方国际赛会使用 BO2 组赛（两局全部打完，可出现 2:0、1:1、0:2）。
+        # 平局不能作为“胜负已确认”的最终比分，但合法的非平局结果总局数应等于
+        # bo_total，而不是套用奇数 BO 的“先到 ceil(n/2) 胜”规则。
+        return home_score != away_score and home_score + away_score == bo_total
     if home_score == away_score:
         return False
     win_target = (bo_total + 1) // 2
@@ -240,13 +243,10 @@ def list_teams(raw_matches):
 
 
 def parse_matches(raw_matches, warn=print):
-    """解析全部原始记录，只保留目标战队参赛的场次；单条记录异常只警告不中断整体。
-
-    返回 (matches, skipped_count)：skipped_count 是因为字段缺失/时间格式非法等
-    解析异常而被跳过的记录数（不包含"跟目标战队无关，正常过滤掉"的记录）。
-    """
+    """解析全部原始记录并保留所有对局；单条异常只警告，不中断整体。"""
     matches = []
     skipped = 0
+    warned_unknown_teams = set()
     for raw in raw_matches:
         try:
             match = normalize_match(raw)
@@ -254,11 +254,10 @@ def parse_matches(raw_matches, warn=print):
             warn(f"[WARN] {exc}")
             skipped += 1
             continue
-        if not is_ag_match(match):
-            continue
         if _DOMESTIC_SEASON_RE.match(match["scheduleid"]):
             for team in (match["home"], match["away"]):
-                if team not in KNOWN_TEAMS and not is_target_team(team):
+                if team not in KNOWN_TEAMS and team not in warned_unknown_teams:
+                    warned_unknown_teams.add(team)
                     warn(
                         f"[WARN] 未知战队名：{team}（scheduleid={match['scheduleid']}），"
                         f"简称显示可能不够准确，请在 match_parser.py 补充 "
